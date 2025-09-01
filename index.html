@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="id">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Absensi</title>
+<style>
+  body{font-family:system-ui,Arial;margin:20px;max-width:640px}
+  label{display:block;margin:8px 0 4px}
+  input,select,button{width:100%;padding:10px;border:1px solid #ccc;border-radius:8px}
+  button{cursor:pointer;margin-top:10px}
+  .muted{color:#666;font-size:12px}
+</style>
+
+<h2>Form Absensi</h2>
+<form id="formAbsensi">
+  <label>NIP</label>
+  <input name="nip" required>
+
+  <label>Nama</label>
+  <input name="nama" required>
+
+  <label>Status</label>
+  <select name="status" required>
+    <option value="HADIR">Hadir</option>
+    <option value="IZIN">Izin</option>
+    <option value="SAKIT">Sakit</option>
+    <option value="LEMBUR">Lembur</option>
+  </select>
+
+  <label>Foto Selfie</label>
+  <input type="file" id="foto" accept="image/*" capture="user">
+
+  <button type="button" id="btnLokasi">Ambil Lokasi</button>
+  <input type="hidden" name="lat">
+  <input type="hidden" name="lng">
+
+  <button type="submit" id="btnKirim">Kirim Absensi</button>
+</form>
+
+<p id="info" class="muted"></p>
+
+<script>
+
+const API_URL = "https://script.google.com/macros/s/AKfycbwd7ygsz6qMrmaFzDxjxR3QktF1j-YmvnfXsikZur9m8QIkzdLPpFna1bL1QsXbPOIz/exec";
+
+// (opsional) autofill dari QR param ?nip=...&nama=...
+const q = new URLSearchParams(location.search);
+if (q.get('nip')) document.querySelector('input[name=nip]').value = q.get('nip');
+if (q.get('nama')) document.querySelector('input[name=nama]').value = q.get('nama');
+
+const info = document.getElementById('info');
+
+document.getElementById('btnLokasi').onclick = ()=>{
+  info.textContent = 'Mengambil lokasi...';
+  if (!navigator.geolocation) { info.textContent='Peramban tidak mendukung GPS.'; return; }
+  navigator.geolocation.getCurrentPosition(p=>{
+    document.querySelector('input[name=lat]').value = p.coords.latitude;
+    document.querySelector('input[name=lng]').value = p.coords.longitude;
+    info.textContent = 'Lokasi berhasil diambil';
+  }, e=>{
+    info.textContent = 'Gagal ambil lokasi: ' + e.message;
+  }, {enableHighAccuracy:true, timeout:10000});
+};
+
+document.getElementById('formAbsensi').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  info.textContent = 'Mengirim...';
+
+  const fd = new FormData(e.target);
+  let fotoBase64 = '';
+  const f = document.getElementById('foto').files[0];
+  if (f) fotoBase64 = await toBase64(f);
+
+  const payload = {
+    nip: fd.get('nip'),
+    nama: fd.get('nama'),
+    status: fd.get('status'),
+    lat: fd.get('lat'),
+    lng: fd.get('lng'),
+    foto: (fotoBase64||'').replace(/^data:image\/\w+;base64,/, '')
+  };
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      const json = await res.json();
+      info.textContent = json.message || (res.ok ? 'Berhasil' : 'Gagal');
+      if (json.success) e.target.reset();
+    } else {
+      const text = await res.text();
+      info.textContent = 'Response bukan JSON: ' + text.slice(0,150) + '...';
+    }
+  } catch (err) {
+    info.textContent = 'Gagal kirim: ' + err.message;
+  }
+});
+
+function toBase64(file){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
+</script>
+</html>
