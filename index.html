@@ -109,5 +109,19 @@ function toBase64(file){
     r.readAsDataURL(file);
   });
 }
+  <button type="button" onclick="testPing()">Tes Koneksi API</button>
+<script>
+async function testPing(){
+  try{
+    const r = await fetch(API_URL);        // GET ke /exec
+    const t = await r.text();
+    alert('Response: ' + t);               // harus "OK"
+  }catch(e){
+    alert('Gagal fetch GET: ' + e.message);
+  }
+}
+</script>
+
 </script>
 </html>
+
